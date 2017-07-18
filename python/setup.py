@@ -1,11 +1,5 @@
-import boto3
-import json
-
-from botocore.client import Config
 # To use a consistent encoding
 from codecs import open
-from distutils import log
-from distutils.errors import DistutilsOptionError, DistutilsArgError
 from os import path
 from setuptools import setup, find_packages, Command
 
@@ -59,59 +53,6 @@ lambda_install_requires = []
 # CHANGES BELOW HERE ARE MADE AT YOUR OWN RISK
 ##############################################
 
-class S3LDistZipUploader(Command):
-    description = 'upload the result of the ldist command to S3'
-    user_options = [
-        # The format is (long option, short option, description).
-        ('s3-access-key=', None, 'The access key to use to upload'),
-        ('s3-secret-access=', None, 'The secret access to use to upload'),
-        ('s3-bucket=', None, 'The bucket to upload to'),
-        ('s3-kms-key=', None, 'The KMS key to use on upload')
-    ]
-
-    def initialize_options(self):
-        """Set default values for options."""
-        # Each user option must be listed here with their default value.
-        setattr(self, 's3_access_key', None)
-        setattr(self, 's3_secret_access', None)
-        setattr(self, 's3_bucket', None)
-        setattr(self, 's3_kms_key', None)
-
-    def finalize_options(self):
-        """Post-process options."""
-        if getattr(self, 's3_access_key') is None or \
-                        getattr(self, 's3_secret_access') is None or \
-                        getattr(self, 's3_bucket') is None or \
-                        getattr(self, 's3_kms_key') is None:
-            raise DistutilsOptionError('s3-access-key, s3-secret-access, s3-bucket and s3-kms-key are required')
-
-    def run(self):
-        """Run command."""
-        self.run_command('ldist')
-        ldist_cmd = self.get_finalized_command('ldist')
-        dist_path = getattr(ldist_cmd, 'dist_path', None)
-        dist_name = getattr(ldist_cmd, 'dist_name', None)
-        if dist_path is None or dist_name is None:
-            raise DistutilsArgError('\'ldist\' missing attributes')
-        s3 = boto3.client('s3',
-                          aws_access_key_id=getattr(self, 's3_access_key'),
-                          aws_secret_access_key=getattr(self, 's3_secret_access'),
-                          config=Config(signature_version='s3v4')
-                          )
-        log.info('uploading to {} using kms key {}'.format(getattr(self, 's3_bucket'), getattr(self, 's3_kms_key')))
-        with open(dist_path) as dist:
-            response = s3.put_object(
-                Body=dist,
-                Bucket=getattr(self, 's3_bucket'),
-                Key=dist_name,
-                ServerSideEncryption='aws:kms',
-                SSEKMSKeyId=getattr(self, 's3_kms_key')
-            )
-            log.info('upload complete:\n{}'.format(
-                json.dumps(response, sort_keys=True, indent=4, separators=(',', ': ')))
-            )
-
-
 setup(
     name=lambda_name,
 
@@ -149,8 +90,5 @@ setup(
 
     lambda_package='src/lambda_function',
 
-    setup_requires=['boto3', 'lambda-setuptools'],
-    cmdclass={
-        's3_upload': S3LDistZipUploader
-    }
+    setup_requires=['lambda-setuptools'],
 )
